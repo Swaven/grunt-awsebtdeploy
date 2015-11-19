@@ -342,7 +342,12 @@ module.exports = function (grunt) {
     }
 
     function waitForHealthPage(env) {
-      if (!options.healthPage || !env.CNAME) {
+      if (!options.healthPage) {
+        grunt.log.write('No health page, no checking health page status');
+        return;
+      }
+      if (!env.CNAME) {
+        grunt.log.write('No cname, no checking health page status');
         return;
       }
 
