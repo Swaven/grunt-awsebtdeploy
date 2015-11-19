@@ -342,7 +342,7 @@ module.exports = function (grunt) {
     }
 
     function waitForHealthPage(env) {
-      if (!options.healthPage) {
+      if (!options.healthPage || !env.CNAME) {
         return;
       }
 
@@ -422,7 +422,7 @@ module.exports = function (grunt) {
             .then(checkHealthPageContents);
       }
 
-      grunt.log.writeln('Checking health page of ' + env.CNAME +
+      grunt.log.writeln('Checking health page of ' + env.EnvironmentName +
           ' (timing out in ' + options.healthPageTimeoutMin + ' minutes)...');
 
       return Q.timeout(checkHealthPage(), options.healthPageTimeoutMin * 60 * 1000);
