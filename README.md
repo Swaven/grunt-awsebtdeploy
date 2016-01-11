@@ -420,8 +420,10 @@ grunt.initConfig({
 ```
 
 ## Release History
+* 2016-01-11      v0.2.0    New option *environmentName*
+* 2015-10-09      v0.1.12 Taking over project, remove obsolete dependency
 * 2014-08-05	    v0.1.11	Support SSL-only ELB instances, ensure environment names contain legit characters
-* 2014-05-27	    v0.1.10	Add new "manual" deploy type
+* 2014-05-27	    v0.1.10	 Add new "manual" deploy type
 * 2014-05-17	    v0.1.9	    Use options.versionDescription when creating an application version
 * 2014-05-09	    v0.1.8    	Target options correctly override task options. Update dependencies
 * 2014-05-02	    v0.1.7	    Add timeout and interval options to logs task, and deploy/health page deploy task
