@@ -420,7 +420,7 @@ grunt.initConfig({
 ```
 
 ## Release History
-* 2016-02-23 [v0.2.1]: Update peer dependency to grunt 1.0.0
+* 2016-02-23 [v0.2.1] (https://github.com/Swaven/grunt-awsebtdeploy/releases/tag/v0.2.1): Update peer dependency to grunt 1.0.0
 * 2016-01-11 v0.2.0: New option *environmentName*
 * 2015-10-09 v0.1.12: Taking over project, remove obsolete dependency
 * 2014-08-05 v0.1.11: Support SSL-only ELB instances, ensure environment names contain legit characters
