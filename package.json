@@ -34,7 +34,7 @@
     "test": "grunt"
   },
   "dependencies": {
-    "aws-sdk": "~2.0.0-rc15",
+    "aws-sdk": "~2.1337.0",
     "q": "~1.0.1",
     "mkdirp": "~0.5.0"
   },
