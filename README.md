@@ -124,6 +124,14 @@ The description of the application version as it appears in Elastic Beanstalk.
 The AWS access key id.  
 If not provided explicitly it is taken from the corresponding environment variable.
 
+##### options.sessionToken
+
+* Type: `String`
+* Default: `process.env.AWS_SESSION_TOKEN`
+
+The optional AWS session token.  
+If not provided explicitly it is taken from the corresponding environment variable.
+
 ##### options.secretAccessKey
 
 * Type: `String`
@@ -420,6 +428,7 @@ grunt.initConfig({
 ```
 
 ## Release History
+* 2023-05-02 [v0.2.2] (https://github.com/Swaven/grunt-awsebtdeploy/releases/tag/v0.2.2): Add optional options.sessionToken for AWS
 * 2016-02-23 [v0.2.1] (https://github.com/Swaven/grunt-awsebtdeploy/releases/tag/v0.2.1): Update peer dependency to grunt 1.0.0
 * 2016-01-11 v0.2.0: New option *environmentName*
 * 2015-10-09 v0.1.12: Taking over project, remove obsolete dependency

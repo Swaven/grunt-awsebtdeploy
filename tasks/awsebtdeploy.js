@@ -70,6 +70,7 @@ module.exports = function (grunt) {
   function setupAWSOptions(options) {
     if (!options.accessKeyId) options.accessKeyId = process.env.AWS_ACCESS_KEY_ID;
     if (!options.secretAccessKey) options.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    if (!options.sessionToken) options.sessionToken = process.env.AWS_SESSION_TOKEN;
 
     if (!options.accessKeyId) grunt.warn('Missing "accessKeyId"');
     if (!options.secretAccessKey) grunt.warn('Missing "secretAccessKey"');
@@ -77,6 +78,7 @@ module.exports = function (grunt) {
     return {
       accessKeyId: options.accessKeyId,
       secretAccessKey: options.secretAccessKey,
+      sessionToken: options.sessionToken,
       region: options.region
     };
   }
