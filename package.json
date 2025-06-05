@@ -1,7 +1,7 @@
 {
   "name": "grunt-awsebtdeploy",
   "description": "A grunt plugin to deploy applications to AWS Elastic Beanstalk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "homepage": "https://github.com/swaven/grunt-awsebtdeploy",
   "author": {
     "name": "Simone Busoli",
@@ -9,9 +9,9 @@
   },
   "contributors": [
     {
-        "name": "Swaven",
-        "email": "antoine@swaven.com",
-        "url": "http://www.swaven.com"
+      "name": "Swaven",
+      "email": "antoine@swaven.com",
+      "url": "http://www.swaven.com"
     }
   ],
   "repository": {
