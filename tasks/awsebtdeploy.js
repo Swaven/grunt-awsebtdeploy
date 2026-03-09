@@ -9,14 +9,28 @@
 'use strict';
 
 module.exports = function (grunt) {
-  var AWS    = require('aws-sdk'),
-      path   = require('path'),
+  var path   = require('path'),
       fs     = require('fs'),
       get    = require('http').get,
       sget   = require('https').get,
       util   = require('util'),
       Q      = require('q'),
       mkdirp = require('mkdirp');
+
+  const {
+    ElasticBeanstalkClient,
+    DescribeApplicationsCommand,
+    DescribeEnvironmentsCommand,
+    CreateApplicationVersionCommand,
+    UpdateEnvironmentCommand,
+    CreateConfigurationTemplateCommand,
+    SwapEnvironmentCNAMEsCommand,
+    CreateEnvironmentCommand,
+    RequestEnvironmentInfoCommand,
+    RetrieveEnvironmentInfoCommand
+  } = require('@aws-sdk/client-elastic-beanstalk');
+
+  const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
   function findEnvironmentByCNAME(data, cname) {
     if (!data || !data.Environments) return false;
@@ -54,16 +68,16 @@ module.exports = function (grunt) {
     return applicationName.replace(/[^a-zA-Z0-9\-]+/g, "") + timePart;
   }
 
-  function wrapAWS(eb, s3) {
+  function wrapAWS(ebClient, s3Client) {
     return {
-      describeApplications: Q.nbind(eb.describeApplications, eb),
-      describeEnvironments: Q.nbind(eb.describeEnvironments, eb),
-      putS3Object: Q.nbind(s3.putObject, s3),
-      createApplicationVersion: Q.nbind(eb.createApplicationVersion, eb),
-      updateEnvironment: Q.nbind(eb.updateEnvironment, eb),
-      createConfigurationTemplate: Q.nbind(eb.createConfigurationTemplate, eb),
-      swapEnvironmentCNAMEs: Q.nbind(eb.swapEnvironmentCNAMEs, eb),
-      createEnvironment: Q.nbind(eb.createEnvironment, eb)
+      describeApplications: (params) => { return ebClient.send(new DescribeApplicationsCommand(params)); },
+      describeEnvironments: (params) => { return ebClient.send(new DescribeEnvironmentsCommand(params)); },
+      putS3Object: (params) => { return s3Client.send(new PutObjectCommand(params)); },
+      createApplicationVersion: (params) => { return ebClient.send(new CreateApplicationVersionCommand(params)); },
+      updateEnvironment: (params) => { return ebClient.send(new UpdateEnvironmentCommand(params)); },
+      createConfigurationTemplate: (params) => { return ebClient.send(new CreateConfigurationTemplateCommand(params)); },
+      swapEnvironmentCNAMEs: (params) => { return ebClient.send(new SwapEnvironmentCNAMEsCommand(params)); },
+      createEnvironment: (params) => { return ebClient.send(new CreateEnvironmentCommand(params)); }
     };
   }
 
@@ -75,9 +89,11 @@ module.exports = function (grunt) {
     if (!options.secretAccessKey) grunt.warn('Missing "secretAccessKey"');
 
     return {
-      accessKeyId: options.accessKeyId,
-      secretAccessKey: options.secretAccessKey,
-      region: options.region
+      region: options.region,
+      credentials: {
+        accessKeyId: options.accessKeyId,
+        secretAccessKey: options.secretAccessKey
+      }
     };
   }
 
@@ -92,21 +108,19 @@ module.exports = function (grunt) {
           intervalSec: 2
         }),
         awsOptions = setupAWSOptions(options),
-        eb         = new AWS.ElasticBeanstalk(awsOptions),
-        request    = Q.nbind(eb.requestEnvironmentInfo, eb),
-        retrieve   = Q.nbind(eb.retrieveEnvironmentInfo, eb),
+        eb         = new ElasticBeanstalkClient(awsOptions),
         args       = { EnvironmentName: options.environmentName, InfoType: 'tail' };
 
     grunt.log.writeln('Requesting logs for environment ' + options.environmentName + '...');
 
-    request(args)
+    eb.send(new RequestEnvironmentInfoCommand(args))
         .then(function (data) {
-          var requestId = data.ResponseMetadata.RequestId;
+          var requestId = data.$metadata && data.$metadata.requestId;
 
           function doRetrieve() {
             return Q.delay(options.intervalSec * 1000)
                 .then(function () {
-                  return retrieve(args);
+                  return eb.send(new RetrieveEnvironmentInfoCommand(args));
                 })
                 .then(function (data) {
                   var deferred = Q.defer(),
@@ -161,6 +175,20 @@ module.exports = function (grunt) {
 
   grunt.registerMultiTask('awsebtdeploy', 'A grunt plugin to deploy applications to AWS Elastic Beanstalk', function () {
 
+    var task    = this,
+        done    = this.async(),
+        options = this.options({
+          versionDescription: '',
+          deployType: 'inPlace',
+          deployTimeoutMin: 10,
+          deployIntervalSec: 20,
+          healthPageTimeoutMin: 5,
+          healthPageIntervalSec: 10
+        }),
+        awsOptions = setupAWSOptions(options),
+        qAWS       = wrapAWS(new ElasticBeanstalkClient(awsOptions), new S3Client(awsOptions));
+
+
     function validateOptions() {
       if (!options.applicationName) grunt.warn('Missing "applicationName"');
       if (!options.environmentCNAME && !options.environmentName) grunt.warn('Missing "environmentCNAME" or "environmentName"');
@@ -200,19 +228,6 @@ module.exports = function (grunt) {
         options.s3.key = path.basename(options.sourceBundle);
       }
     }
-
-    var task    = this,
-        done    = this.async(),
-        options = this.options({
-          versionDescription: '',
-          deployType: 'inPlace',
-          deployTimeoutMin: 10,
-          deployIntervalSec: 20,
-          healthPageTimeoutMin: 5,
-          healthPageIntervalSec: 10
-        }),
-        awsOptions = setupAWSOptions(options),
-        qAWS       = wrapAWS(new AWS.ElasticBeanstalk(awsOptions), new AWS.S3(awsOptions));
 
     validateOptions();
 
@@ -475,7 +490,7 @@ module.exports = function (grunt) {
 
       grunt.verbose.writeflags(s3Object, 's3Param');
 
-      s3Object.Body = new Buffer(fs.readFileSync(options.sourceBundle));
+      s3Object.Body = fs.readFileSync(options.sourceBundle);
 
       grunt.log.write('Uploading source bundle "' + options.sourceBundle +
           '" to S3 location "' + options.s3.bucket + '/' + options.s3.key + '"...');

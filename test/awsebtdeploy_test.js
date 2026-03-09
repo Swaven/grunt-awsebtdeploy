@@ -3,8 +3,13 @@
 var get = require('http').get,
     fs = require('fs'),
     path = require('path'),
-    AWS = require('aws-sdk'),
     credentials;
+
+const {
+  ElasticBeanstalkClient,
+  DescribeEnvironmentsCommand,
+  TerminateEnvironmentCommand
+} = require('@aws-sdk/client-elastic-beanstalk');
 
 try {
   credentials = require('grunt-awsebtdeploy-credentials');
@@ -15,10 +20,12 @@ try {
   };
 }
 
-AWS.config.update({
+const ebClient = new ElasticBeanstalkClient({
   region: 'eu-west-1',
-  accessKeyId: credentials.accessKeyId,
-  secretAccessKey: credentials.secretAccessKey
+  credentials: {
+    accessKeyId: credentials.accessKeyId,
+    secretAccessKey: credentials.secretAccessKey
+  }
 });
 
 /*
@@ -55,35 +62,35 @@ function checkResponse(test, res, callback) {
 }
 
 function terminateEnvironment(appName, callback) {
-  var ebt = new AWS.ElasticBeanstalk(),
-      cname = appName + '.elasticbeanstalk.com';
+  var cname = appName + '.elasticbeanstalk.com';
 
   console.log('Attempting to terminate idle environment for application ' + appName);
 
-  ebt.describeEnvironments({ ApplicationName: appName, IncludeDeleted: false }, function (err, data) {
-    if (err) throw err;
+  ebClient.send(new DescribeEnvironmentsCommand({ ApplicationName: appName, IncludeDeleted: false }))
+    .then(function (data) {
+      if (data.Environments.length !== 2)
+        throw new Error('Was expecting to find 2 active environments only');
 
-    if (data.Environments.length !== 2)
-      throw new Error('Was expecting to find 2 active environments only');
+      var envToDelete = data.Environments.filter(function (env) {
+        return env.CNAME !== cname;
+      });
 
-    var envToDelete = data.Environments.filter(function (env) {
-      return env.CNAME !== cname;
-    });
+      if (envToDelete.length !== 1) {
+        throw new Error('Found ' + envToDelete.length +
+            ' environments with a CNAME different from ' + cname);
+      }
 
-    if (envToDelete.length !== 1) {
-      throw new Error('Found ' + envToDelete.length +
-          ' environments with a CNAME different from ' + cname);
-    }
-
-    ebt.terminateEnvironment({
-      EnvironmentName: envToDelete[0].EnvironmentName
-    }, function (err, data) {
-      if (err) throw err;
-
+      return ebClient.send(new TerminateEnvironmentCommand({
+        EnvironmentName: envToDelete[0].EnvironmentName
+      }));
+    })
+    .then(function (data) {
       console.log('Successfully terminated environment ' + data.EnvironmentName);
       callback();
+    })
+    .catch(function (err) {
+      throw err;
     });
-  });
 }
 
 exports.awsebtdeploy = {
