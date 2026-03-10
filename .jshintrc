@@ -1,8 +1,9 @@
 {
   "curly": false,
   "eqeqeq": true,
+  "esnext": true,
   "immed": true,
-  "latedef": true,
+  "latedef": "nofunc",
   "newcap": true,
   "noarg": true,
   "sub": true,
