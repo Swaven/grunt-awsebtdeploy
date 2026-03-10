@@ -14,9 +14,9 @@ module.exports = function (grunt) {
       get    = require('http').get,
       sget   = require('https').get,
       util   = require('util'),
-      Q      = require('q'),
-      mkdirp = require('mkdirp');
+      Q      = require('q');
 
+  const { mkdir } = require('fs/promises');
   const {
     ElasticBeanstalkClient,
     DescribeApplicationsCommand,
@@ -141,8 +141,8 @@ module.exports = function (grunt) {
                         res.on('data', function (chunk) {
                           data.push(chunk);
                         });
-                        res.on('end', function () {
-                          mkdirp.sync(outputPath);
+                        res.on('end', async function () {
+                          await mkdir(outputPath, { recursive: true });
 
                           var fileName = path.join(outputPath, info.Name);
                           grunt.log.writeln('Writing log file for EC2 instance ' +

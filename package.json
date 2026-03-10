@@ -28,15 +28,14 @@
     }
   ],
   "engines": {
-    "node": ">= 0.8.0"
+    "node": ">= 18.0.0"
   },
   "scripts": {
     "test": "grunt"
   },
   "dependencies": {
-    "@aws-sdk/client-elastic-beanstalk": "^3.0.0",
-    "@aws-sdk/client-s3": "^3.0.0",
-    "mkdirp": "~0.5.0",
+    "@aws-sdk/client-elastic-beanstalk": "^3.1005.0",
+    "@aws-sdk/client-s3": "^3.1005.0",
     "q": "~1.0.1"
   },
   "devDependencies": {

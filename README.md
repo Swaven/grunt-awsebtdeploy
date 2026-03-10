@@ -359,7 +359,7 @@ It must exist and be accessible with the provided AWS authorization tokens.
 * Type: `String`
 
 The path on the file system where log files are saved.
-If the path does not exist it is created with `mkdirp`.
+If the path does not exist it is created with Node's built-in `fs/promises` `mkdir` (recursive).
 
 ##### options.region *
 
