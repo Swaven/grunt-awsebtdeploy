@@ -35,8 +35,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-elastic-beanstalk": "^3.1005.0",
-    "@aws-sdk/client-s3": "^3.1005.0",
-    "q": "~1.0.1"
+    "@aws-sdk/client-s3": "^3.1005.0"
   },
   "devDependencies": {
     "adm-zip": "~0.4.4",

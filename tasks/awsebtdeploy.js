@@ -13,8 +13,24 @@ module.exports = function (grunt) {
       fs     = require('fs'),
       get    = require('http').get,
       sget   = require('https').get,
-      util   = require('util'),
-      Q      = require('q');
+      util   = require('util');
+
+  function delay(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function timeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (_, reject) {
+        setTimeout(function () {
+          reject(new Error('Operation timed out'));
+        }, ms);
+      })
+    ]);
+  }
 
   const { mkdir } = require('fs/promises');
   const {
@@ -118,24 +134,24 @@ module.exports = function (grunt) {
           var requestId = data.$metadata && data.$metadata.requestId;
 
           function doRetrieve() {
-            return Q.delay(options.intervalSec * 1000)
+            return delay(options.intervalSec * 1000)
                 .then(function () {
                   return eb.send(new RetrieveEnvironmentInfoCommand(args));
                 })
                 .then(function (data) {
-                  var deferred = Q.defer(),
-                      found = data.EnvironmentInfo.filter(function (info) {
-                        return info.BatchId === requestId;
-                      });
+                  var found = data.EnvironmentInfo.filter(function (info) {
+                    return info.BatchId === requestId;
+                  });
 
                   if (!found || !found.length) {
                     grunt.log.writeln('Still waiting for logs...');
-                    deferred.resolve(doRetrieve());
-                  } else {
-                    deferred.resolve(Q.all(found.map(function (info) {
-                      var outputPath = path.join(options.outputPath, info.BatchId),
-                          batchDeferred = Q.defer();
+                    return doRetrieve();
+                  }
 
+                  return Promise.all(found.map(function (info) {
+                    var outputPath = path.join(options.outputPath, info.BatchId);
+
+                    return new Promise(function (resolve, reject) {
                       sget(info.Message, function (res) {
                         var data = [];
                         res.on('data', function (chunk) {
@@ -149,26 +165,22 @@ module.exports = function (grunt) {
                               info.Ec2InstanceId + ' to ' + fileName);
 
                           fs.writeFile(fileName, data, function (err) {
-                            if (err) return batchDeferred.reject(err);
+                            if (err) return reject(err);
 
                             grunt.log.ok();
-                            batchDeferred.resolve();
+                            resolve();
                           });
                         });
                         res.on('error', function (err) {
-                          batchDeferred.reject(err);
+                          reject(err);
                         });
                       });
-
-                      return batchDeferred.promise;
-                    })));
-                  }
-
-                  return deferred.promise;
+                    });
+                  }));
                 });
           }
 
-          return Q.timeout(doRetrieve(), options.timeoutSec * 1000);
+          return timeout(doRetrieve(), options.timeoutSec * 1000);
         })
         .then(done, done);
   });
@@ -278,8 +290,10 @@ module.exports = function (grunt) {
 
     function swapDeploy(env) {
       return createConfigurationTemplate(env)
-          .spread(createNewEnvironment)
-          .spread(function (oldEnv, newEnv) {
+          .then(function ([env, templateData]) {
+            return createNewEnvironment(env, templateData);
+          })
+          .then(function ([oldEnv, newEnv]) {
             return waitForDeployment(newEnv)
                 .then(waitForHealthPage)
                 .then(swapEnvironmentCNAMEs.bind(task, oldEnv, newEnv))
@@ -311,7 +325,7 @@ module.exports = function (grunt) {
           options.deployTimeoutMin + ' minutes)...');
 
       function checkDeploymentComplete() {
-        return Q.delay(options.deployIntervalSec * 1000)
+        return delay(options.deployIntervalSec * 1000)
             .then(function () {
               return qAWS.describeEnvironments({
                 ApplicationName: options.applicationName,
@@ -353,7 +367,7 @@ module.exports = function (grunt) {
             });
       }
 
-      return Q.timeout(checkDeploymentComplete(), options.deployTimeoutMin * 60 * 1000);
+      return timeout(checkDeploymentComplete(), options.deployTimeoutMin * 60 * 1000);
     }
 
     function waitForHealthPage(env) {
@@ -369,40 +383,37 @@ module.exports = function (grunt) {
       function checkHealthPageStatus() {
         grunt.log.write('Checking health page status...');
 
-        var deferred = Q.defer();
-
-        var checkHealthPageRequest = {
-          hostname: env.CNAME,
-          path: options.healthPage,
-          headers: {
-            'cache-control': 'no-cache'
-          }
-        };
-        var checkoutHealthPageCallback = function (res) {
-          if (res.statusCode === 200) {
-            grunt.log.ok();
-            deferred.resolve(res);
+        return new Promise(function (resolve) {
+          var checkHealthPageRequest = {
+            hostname: env.CNAME,
+            path: options.healthPage,
+            headers: {
+              'cache-control': 'no-cache'
+            }
+          };
+          var checkoutHealthPageCallback = function (res) {
+            if (res.statusCode === 200) {
+              grunt.log.ok();
+              resolve(res);
+            } else {
+              grunt.log.writeln('Status ' + res.statusCode);
+              resolve(
+                delay(options.healthPageIntervalSec * 1000)
+                  .then(checkHealthPage));
+            }
+          };
+          if (options.healthPageScheme === 'https') {
+            //Necessary because ELB's security certificate won't be valid yet.
+            checkHealthPageRequest.rejectUnauthorized = false;
+            sget(checkHealthPageRequest, checkoutHealthPageCallback);
           } else {
-            grunt.log.writeln('Status ' + res.statusCode);
-            deferred.resolve(
-              Q.delay(options.healthPageIntervalSec * 1000)
-               .then(checkHealthPage));
+            get(checkHealthPageRequest, checkoutHealthPageCallback);
           }
-        };
-        if (options.healthPageScheme === 'https') {
-          //Necessary because ELB's security certificate won't be valid yet.
-          checkHealthPageRequest.rejectUnauthorized = false;
-          sget(checkHealthPageRequest, checkoutHealthPageCallback);
-        } else {
-          get(checkHealthPageRequest, checkoutHealthPageCallback);
-        }
-
-        return deferred.promise;
+        });
       }
 
       function checkHealthPageContents(res) {
-        var body,
-            deferred = Q.defer();
+        var body;
 
         if (!options.healthPageContents) return;
 
@@ -411,30 +422,30 @@ module.exports = function (grunt) {
 
         res.setEncoding('utf8');
 
-        res.on('data', function (chunk) {
-          if (!body) body = chunk;
-          else body += chunk;
+        return new Promise(function (resolve) {
+          res.on('data', function (chunk) {
+            if (!body) body = chunk;
+            else body += chunk;
+          });
+          res.on('end', function () {
+            var ok;
+
+            if (util.isRegExp(options.healthPageContents)) {
+              ok = options.healthPageContents.test(body);
+            } else {
+              ok = options.healthPageContents === body;
+            }
+
+            if (ok) {
+              grunt.log.ok();
+              resolve();
+            } else {
+              grunt.log.error('Got ' + body);
+              resolve(
+                delay(options.healthPageIntervalSec * 1000).then(checkHealthPage));
+            }
+          });
         });
-        res.on('end', function () {
-          var ok;
-
-          if (util.isRegExp(options.healthPageContents)) {
-            ok = options.healthPageContents.test(body);
-          } else {
-            ok = options.healthPageContents === body;
-          }
-
-          if (ok) {
-            grunt.log.ok();
-            deferred.resolve();
-          } else {
-            grunt.log.error('Got ' + body);
-            deferred.resolve(
-                Q.delay(options.healthPageIntervalSec * 1000).then(checkHealthPage));
-          }
-        });
-
-        return deferred.promise;
       }
 
       function checkHealthPage() {
@@ -445,7 +456,7 @@ module.exports = function (grunt) {
       grunt.log.writeln('Checking health page of ' + env.EnvironmentName +
           ' (timing out in ' + options.healthPageTimeoutMin + ' minutes)...');
 
-      return Q.timeout(checkHealthPage(), options.healthPageTimeoutMin * 60 * 1000);
+      return timeout(checkHealthPage(), options.healthPageTimeoutMin * 60 * 1000);
     }
 
     function invokeDeployType(env) {
