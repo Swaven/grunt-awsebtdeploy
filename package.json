@@ -1,7 +1,7 @@
 {
   "name": "grunt-awsebtdeploy",
   "description": "A grunt plugin to deploy applications to AWS Elastic Beanstalk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "homepage": "https://github.com/swaven/grunt-awsebtdeploy",
   "author": {
     "name": "Simone Busoli",
@@ -28,16 +28,14 @@
     }
   ],
   "engines": {
-    "node": ">= 0.8.0"
+    "node": ">= 18.0.0"
   },
   "scripts": {
     "test": "grunt"
   },
   "dependencies": {
-    "@aws-sdk/client-elastic-beanstalk": "^3.0.0",
-    "@aws-sdk/client-s3": "^3.0.0",
-    "mkdirp": "~0.5.0",
-    "q": "~1.0.1"
+    "@aws-sdk/client-elastic-beanstalk": "^3.1005.0",
+    "@aws-sdk/client-s3": "^3.1005.0"
   },
   "devDependencies": {
     "adm-zip": "~0.4.4",
